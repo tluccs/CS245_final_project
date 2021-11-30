@@ -111,11 +111,11 @@ class EMGCN(NetworkAlignmentModel):
     def get_simi_att(self):
         simi = np.zeros((self.n_node_s, self.n_node_t))
         value_simi = np.zeros((self.n_node_s, self.n_node_t))
-        #i = 0
+        i = 0
         for snode in tqdm(self.source_att_value):
-            #i += 1
-            #if i > 100:
-            #    break
+            i += 1
+            if i > 100 and self.args.emb_epochs == 1: #testing 
+                break
             if len(self.source_att_value[snode]['att']) == 0:
                 continue
             snode_index = self.source_dataset.id2idx[snode]

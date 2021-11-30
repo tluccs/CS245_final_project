@@ -93,7 +93,7 @@ class EM_GCN(nn.Module):
             input_dim = self.GCNs[-1].output_dim
             
         self.GCNs = nn.ModuleList(self.GCNs)
-        fc_in = 100
+        fc_in = output_dim
         self.fc_layer = nn.Linear(fc_in, output_dim)
         init_weight(self.modules(), activate_function)
 
@@ -113,7 +113,7 @@ class EM_GCN(nn.Module):
             outputs.append(GCN_output_i)
             GCN_input_i1 = GCN_output_i1
             GCN_input_i2 = GCN_output_i2
-        print("Try direct")
+        #print("Try direct")
         fc_out = self.fc_layer(GCN_output_i)
         outputs.append(fc_out)
         return outputs
@@ -129,7 +129,7 @@ class EM_GCN(nn.Module):
             GCN_output = self.GCNs[i](A_hat, emb_input)
             outputs.append(GCN_output)
             emb_input = GCN_output
-        print("Try undirect")
+        #print("Try undirect")
         fc_out = self.fc_layer(GCN_output)
         outputs.append(fc_out)
         return outputs
