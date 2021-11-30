@@ -36,7 +36,20 @@ class GCN(nn.Module):
         # if self.activate_function is not None:
         output = self.linear(input)
         
-        output = torch.matmul(A_hat, output)
+        try:
+            A_numpy = A_hat.to_dense().numpy()
+            D_invroot = torch.tensor(np.diag(np.sqrt(np.reciprocal(np.sum(A_numpy,1)))))
+            output = torch.matmul(D_invroot, output) 
+            output = torch.matmul(A_hat, output)
+            output = torch.matmul(D_invroot, output) 
+
+        except:
+            A_numpy = A_hat.numpy()
+            D_invroot = torch.tensor(np.diag(np.sqrt(np.reciprocal(np.sum(A_numpy,1)))))
+            output = torch.matmul(D_invroot, output) 
+            output = torch.matmul(A_hat, output)
+            output = torch.matmul(D_invroot, output) 
+
 
         # do not activate at last layer
         if self.activate_function is not None:
@@ -73,13 +86,15 @@ class EM_GCN(nn.Module):
         self.GCNs = []
         for i in range(num_GCN_blocks):
             # Last layer is like GCN-align
-            if i == num_GCN_blocks - 1:
-                self.GCNs.append(GCN("", input_dim, output_dim))
-            else:
-                self.GCNs.append(GCN(activate_function, input_dim, output_dim))
+            #if i == num_GCN_blocks - 1:
+            #    self.GCNs.append(GCN("", input_dim, output_dim))
+            #else:
+            self.GCNs.append(GCN(activate_function, input_dim, output_dim))
             input_dim = self.GCNs[-1].output_dim
             
         self.GCNs = nn.ModuleList(self.GCNs)
+        fc_in = 100
+        self.fc_layer = nn.Linear(fc_in, output_dim)
         init_weight(self.modules(), activate_function)
 
 
@@ -98,6 +113,9 @@ class EM_GCN(nn.Module):
             outputs.append(GCN_output_i)
             GCN_input_i1 = GCN_output_i1
             GCN_input_i2 = GCN_output_i2
+        print("Try direct")
+        fc_out = self.fc_layer(GCN_output_i)
+        outputs.append(fc_out)
         return outputs
 
     
@@ -111,6 +129,9 @@ class EM_GCN(nn.Module):
             GCN_output = self.GCNs[i](A_hat, emb_input)
             outputs.append(GCN_output)
             emb_input = GCN_output
+        print("Try undirect")
+        fc_out = self.fc_layer(GCN_output)
+        outputs.append(fc_out)
         return outputs
     
 

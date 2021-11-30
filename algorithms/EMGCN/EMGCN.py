@@ -107,11 +107,15 @@ class EMGCN(NetworkAlignmentModel):
         target_feats = F.normalize(target_feats)
         return source_A_hat, target_A_hat, source_feats, target_feats, source_A_hat_sym, target_A_hat_sym
     
-
+    #try change this
     def get_simi_att(self):
         simi = np.zeros((self.n_node_s, self.n_node_t))
         value_simi = np.zeros((self.n_node_s, self.n_node_t))
+        #i = 0
         for snode in tqdm(self.source_att_value):
+            #i += 1
+            #if i > 100:
+            #    break
             if len(self.source_att_value[snode]['att']) == 0:
                 continue
             snode_index = self.source_dataset.id2idx[snode]
@@ -251,13 +255,16 @@ class EMGCN(NetworkAlignmentModel):
         print("Done structural training")
 
         embedding_model.eval()
+        print("Done embedding eval, get simi...")
         self.att_simi_matrix, self.value_simi_matrix = self.get_simi_att()
+        print("got simi")
         att_value_simi_matrix = self.att_simi_matrix + self.value_simi_matrix
         source_A_hat = source_A_hat.to_dense()
         target_A_hat = target_A_hat.to_dense()
         # refinement
-
+        print("refining..")
         self.refine(embedding_model, refinement_model, source_A_hat, target_A_hat, att_value_simi_matrix)            
+        print("Done refine")
 
 
     def align(self):
