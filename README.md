@@ -1,3 +1,6 @@
+CS 245 project on entity alignment.
+
+ADAPTED FROM
 # EMGCN
 Code of the paper: ***Entity Alignment for Knowledge Graphs with Multi-order Convolutional Networks***.
 
