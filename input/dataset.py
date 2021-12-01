@@ -554,7 +554,17 @@ class Dataset:
             index_pairs[new_pair[0]] = new_pair[1]
 
         return index_pairs
-
+    
+    def cosine_simi(self, source_set, target_set):
+        # https://datascience.stackexchange.com/questions/5121/applications-and-differences-for-jaccard-similarity-and-cosine-similarity/38850
+        if len(source_set) == 0 or len(target_set) == 0:
+            return 0
+        st_intersect = len(source_set.intersection(target_set))
+        s_diff = len(source_set.difference(target_set))
+        t_diff = len(target_set.difference(source_set))
+        denom = (st_intersect + s_diff)* (st_intersect + t_diff)
+        num = st_intersect / np.sqrt(denom)
+        return num
 
     def jaccard_simi(self, source_set, target_set):
         if len(source_set) == 0 or len(target_set) == 0:

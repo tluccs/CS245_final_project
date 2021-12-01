@@ -151,13 +151,14 @@ def get_dict_from_S(S, source_id2idx, target_id2idx):
     dictt = {idx2id_source[i]: idx2id_target[target[i]] for i in range(S.shape[0])}
     return dictt
 
+#modify
 def linkpred_loss(embedding, A, i, cuda):
     pred_adj = torch.matmul(F.normalize(embedding), F.normalize(embedding).t())
     if cuda:
-        pred_adj = F.normalize((torch.min(pred_adj, torch.Tensor([1]).cuda())), dim = 1)
+        pred_adj = F.normalize((torch.min(pred_adj, torch.Tensor([1]).cuda())), dim = 1) #A
     else:
         pred_adj = F.normalize((torch.min(pred_adj, torch.Tensor([1]))), dim = 1)
-    linkpred_losss = (pred_adj - A) ** 2
+    linkpred_losss = (pred_adj -  A ) ** 2 #D^-1/2
     linkpred_losss = linkpred_losss.sum() / A.shape[1]
     return linkpred_losss
 

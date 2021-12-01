@@ -130,11 +130,13 @@ class EMGCN(NetworkAlignmentModel):
                 for ele in common_att:
                     source_values = self.source_att_value[snode]['att_value'][ele]
                     target_values = self.target_att_value[tnode]['att_value'][ele]
-                    value_simi_this += self.source_dataset.jaccard_simi(source_values, target_values)
+                    #value_simi_this += self.source_dataset.jaccard_simi(source_values, target_values)
+                    value_simi_this += self.source_dataset.cosine_simi(source_values, target_values)
                 if value_simi_this > 0:
                     value_simi_this /= len(common_att)
                 value_simi[snode_index, tnode_index] = value_simi_this
-                simi[snode_index, tnode_index] = self.source_dataset.jaccard_simi(snode_att, tnode_att)
+                #simi[snode_index, tnode_index] = self.source_dataset.jaccard_simi(snode_att, tnode_att)
+                simi[snode_index, tnode_index] = self.source_dataset.cosine_simi(snode_att, tnode_att)
         return simi, value_simi
 
 

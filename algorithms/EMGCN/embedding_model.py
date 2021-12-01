@@ -36,6 +36,7 @@ class GCN(nn.Module):
         # if self.activate_function is not None:
         output = self.linear(input)
         
+        #output = torch.matmul(A_hat, output)
         try:
             A_numpy = A_hat.to_dense().numpy()
             D_invroot = torch.tensor(np.diag(np.sqrt(np.reciprocal(np.sum(A_numpy,1)))))
