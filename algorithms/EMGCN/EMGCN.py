@@ -6,7 +6,7 @@ from algorithms.network_alignment_model import NetworkAlignmentModel
 from utils.graph_utils import load_gt
 import torch.nn.functional as F
 
-from algorithms.EMGCN.utils import cv_coo_sparse, get_acc, normalize_numpy, get_similarity_matrices, get_numpy_simi_matrix, get_cosine, get_dict_from_S, linkpred_loss_multiple_layer
+from algorithms.EMGCN.utils import cv_coo_sparse, get_acc, normalize_numpy, get_similarity_matrices, get_numpy_simi_matrix, get_cosine, get_dict_from_S, linkpred_loss_multiple_layer, supervised_loss_multiple_layer
 from scipy import sparse as sp
 import torch
 import numpy as np
@@ -17,10 +17,12 @@ from numpy import *
 import torch
 import torch.nn as nn
 
+
 class EMGCN(NetworkAlignmentModel):
     """
     EMGCN model for Knowledge Graph Alignment task
     """
+
     def __init__(self, source_dataset, target_dataset, args):
         """
         :params source_dataset: source graph
@@ -34,18 +36,20 @@ class EMGCN(NetworkAlignmentModel):
         self.alpha_att_val = [args.rel, args.att, args.attval]
         self.n_node_s = len(self.source_dataset.G.nodes())
         self.n_node_t = len(self.target_dataset.G.nodes())
-        self.full_dict = load_gt(args.groundtruth, source_dataset.id2idx, target_dataset.id2idx, 'dict')
+        self.full_dict = load_gt(
+            args.groundtruth, source_dataset.id2idx, target_dataset.id2idx, 'dict')
         self.alphas = [1, 1, 1, 1, 1, 1]
         self.att_dict1, self.att_dict2 = self.source_dataset.get_raw_att_dicts()
         self.source_att_set = set(self.att_dict1.keys())
         self.target_att_set = set(self.att_dict2.keys())
         self.kept_att = self.source_att_set.intersection(self.target_att_set)
-        self.att_dict_inverse1 = {v:k for k,v in self.att_dict1.items()}
-        self.att_dict_inverse2 = {v:k for k,v in self.att_dict2.items()}
-        self.source_att_value = self.source_dataset.get_the_raw_datastructure(self.source_dataset.ent_att_val1, self.att_dict_inverse1, self.kept_att)
-        self.target_att_value = self.source_dataset.get_the_raw_datastructure(self.source_dataset.ent_att_val2, self.att_dict_inverse2, self.kept_att)
+        self.att_dict_inverse1 = {v: k for k, v in self.att_dict1.items()}
+        self.att_dict_inverse2 = {v: k for k, v in self.att_dict2.items()}
+        self.source_att_value = self.source_dataset.get_the_raw_datastructure(
+            self.source_dataset.ent_att_val1, self.att_dict_inverse1, self.kept_att)
+        self.target_att_value = self.source_dataset.get_the_raw_datastructure(
+            self.source_dataset.ent_att_val2, self.att_dict_inverse2, self.kept_att)
         self.statistic()
-
 
     def count_att_val(self, data):
         count = 0
@@ -53,14 +57,14 @@ class EMGCN(NetworkAlignmentModel):
             count += len(value['att'])
         return count
 
-
     def statistic(self):
         print("Number of filted att source: {}".format(len(self.source_att_set)))
         print("Number of filted att target: {}".format(len(self.target_att_set)))
         print("Number of att dict: {}".format(len(self.kept_att)))
-        print("Number of att triple source: {}".format(self.count_att_val(self.source_att_value)))
-        print("Number of att triple target: {}".format(self.count_att_val(self.target_att_value)))
-
+        print("Number of att triple source: {}".format(
+            self.count_att_val(self.source_att_value)))
+        print("Number of att triple target: {}".format(
+            self.count_att_val(self.target_att_value)))
 
     def get_elements(self):
         """
@@ -69,10 +73,14 @@ class EMGCN(NetworkAlignmentModel):
         """
         # sparse
         start_A_hat = time.time()
-        source_A_hat = self.source_dataset.construct_laplacian(sparse=self.args.sparse, direct=self.args.direct_adj, typee="new")
-        target_A_hat = self.target_dataset.construct_laplacian(sparse=self.args.sparse, direct=self.args.direct_adj, typee="new")
-        source_A_hat_sym = self.source_dataset.construct_laplacian(sparse=self.args.sparse, direct=False, typee="new")
-        target_A_hat_sym = self.target_dataset.construct_laplacian(sparse=self.args.sparse, direct=False, typee="new")
+        source_A_hat = self.source_dataset.construct_laplacian(
+            sparse=self.args.sparse, direct=self.args.direct_adj, typee="new")
+        target_A_hat = self.target_dataset.construct_laplacian(
+            sparse=self.args.sparse, direct=self.args.direct_adj, typee="new")
+        source_A_hat_sym = self.source_dataset.construct_laplacian(
+            sparse=self.args.sparse, direct=False, typee="new")
+        target_A_hat_sym = self.target_dataset.construct_laplacian(
+            sparse=self.args.sparse, direct=False, typee="new")
 
         if sp.issparse(source_A_hat):
             source_A_hat = cv_coo_sparse(source_A_hat)
@@ -84,7 +92,7 @@ class EMGCN(NetworkAlignmentModel):
             target_A_hat = torch.FloatTensor(target_A_hat)
             source_A_hat_sym = torch.FloatTensor(source_A_hat_sym)
             target_A_hat_sym = torch.FloatTensor(target_A_hat_sym)
-        
+
         if self.args.cuda:
             source_A_hat = source_A_hat.cuda()
             target_A_hat = target_A_hat.cuda()
@@ -106,16 +114,12 @@ class EMGCN(NetworkAlignmentModel):
         source_feats = F.normalize(source_feats)
         target_feats = F.normalize(target_feats)
         return source_A_hat, target_A_hat, source_feats, target_feats, source_A_hat_sym, target_A_hat_sym
-    
-    #try change this
+
     def get_simi_att(self):
         simi = np.zeros((self.n_node_s, self.n_node_t))
         value_simi = np.zeros((self.n_node_s, self.n_node_t))
-        i = 0
         for snode in tqdm(self.source_att_value):
-            i += 1
-            if i > 100 and self.args.emb_epochs == 1: #testing 
-                break
+            # print('snode', snode)
             if len(self.source_att_value[snode]['att']) == 0:
                 continue
             snode_index = self.source_dataset.id2idx[snode]
@@ -130,15 +134,14 @@ class EMGCN(NetworkAlignmentModel):
                 for ele in common_att:
                     source_values = self.source_att_value[snode]['att_value'][ele]
                     target_values = self.target_att_value[tnode]['att_value'][ele]
-                    #value_simi_this += self.source_dataset.jaccard_simi(source_values, target_values)
-                    value_simi_this += self.source_dataset.cosine_simi(source_values, target_values)
+                    value_simi_this += self.source_dataset.jaccard_simi(
+                        source_values, target_values)
                 if value_simi_this > 0:
                     value_simi_this /= len(common_att)
                 value_simi[snode_index, tnode_index] = value_simi_this
-                #simi[snode_index, tnode_index] = self.source_dataset.jaccard_simi(snode_att, tnode_att)
-                simi[snode_index, tnode_index] = self.source_dataset.cosine_simi(snode_att, tnode_att)
+                simi[snode_index, tnode_index] = self.source_dataset.jaccard_simi(
+                    snode_att, tnode_att)
         return simi, value_simi
-
 
     def score(self, dictt):
         source_edges = self.source_dataset.G.edges()
@@ -150,8 +153,6 @@ class EMGCN(NetworkAlignmentModel):
                 count_true += 1
         return count_true / len(source_edges)
 
-
-
     def get_candidate(self, source_outputs, target_outputs, num_stable):
         List_S = get_similarity_matrices(source_outputs, target_outputs)
         #List_S_2 = [self.att_simi_matrix, self.value_simi_matrix]
@@ -160,18 +161,19 @@ class EMGCN(NetworkAlignmentModel):
         target_candidates = []
         count_true_candidates = 0
         if len(List_S) < 2:
-            print("The current model doesn't support refinement for number of GCN layer smaller than 2")
+            print(
+                "The current model doesn't support refinement for number of GCN layer smaller than 2")
             return torch.LongTensor(source_candidates), torch.LongTensor(target_candidates)
 
         num_source_nodes = self.n_node_s
         num_target_nodes = self.n_node_t
 
-
         def k_largest_index_argsort(a, k):
             idx = np.argsort(a.ravel())[:-k-1:-1]
             return np.column_stack(np.unravel_index(idx, a.shape))
 
-        stable_candidates_layer0 = k_largest_index_argsort(List_S[0], num_stable)
+        stable_candidates_layer0 = k_largest_index_argsort(
+            List_S[0], num_stable)
         source_candidates = stable_candidates_layer0[:, 0]
         target_candidates = stable_candidates_layer0[:, 1]
         for i in range(1, len(List_S)):
@@ -186,7 +188,7 @@ class EMGCN(NetworkAlignmentModel):
                     target_candidate_layer_i.append(target_k)
             source_candidates = source_candidate_layer_i
             target_candidates = target_candidate_layer_i
-        
+
         count_true_candidates = 0
         for i in range(i, len(source_candidates)):
             try:
@@ -194,9 +196,9 @@ class EMGCN(NetworkAlignmentModel):
                     count_true_candidates += 1
             except:
                 continue
-        print("Num candidates: {}, num true candidates: {}".format(len(source_candidates), count_true_candidates))
+        print("Num candidates: {}, num true candidates: {}".format(
+            len(source_candidates), count_true_candidates))
         return torch.LongTensor(source_candidates), torch.LongTensor(target_candidates)
-
 
     def refine(self, embedding_model, refinement_model, source_A_hat, target_A_hat, att_value_simi_matrix):
         # INIT BEFORE LOOP
@@ -205,13 +207,15 @@ class EMGCN(NetworkAlignmentModel):
         acc, self.S, _ = get_acc(source_outputs, target_outputs, self.alphas)
         print("ACC: ".format(acc))
 
-        dictt = get_dict_from_S(self.S, self.source_dataset.id2idx, self.target_dataset.id2idx)
+        dictt = get_dict_from_S(
+            self.S, self.source_dataset.id2idx, self.target_dataset.id2idx)
         score = self.score(dictt)
         score_max = score
 
         for epoch in tqdm(range(self.args.refinement_epochs)):
             print("Refinement epoch: {}".format(epoch))
-            source_candidates, target_candidates = self.get_candidate(source_outputs, target_outputs, (epoch+1) * self.args.num_each_refine) 
+            source_candidates, target_candidates = self.get_candidate(
+                source_outputs, target_outputs, (epoch+1) * self.args.num_each_refine)
             refinement_model.alpha_source[source_candidates] *= self.args.point
             refinement_model.alpha_target[target_candidates] *= self.args.point
 
@@ -223,17 +227,17 @@ class EMGCN(NetworkAlignmentModel):
             acc, S, _ = get_acc(source_outputs, target_outputs, self.alphas)
             print(acc)
             score = np.max(S, axis=1).mean()
-            dictt = get_dict_from_S(S, self.source_dataset.id2idx, self.target_dataset.id2idx)
+            dictt = get_dict_from_S(
+                S, self.source_dataset.id2idx, self.target_dataset.id2idx)
             score = self.score(dictt)
             if score > score_max:
                 score_max = score
                 self.S = S
 
-        self.S = self.alpha_att_val[0] * self.S + self.alpha_att_val[1] * att_value_simi_matrix
-
+        self.S = self.alpha_att_val[0] * self.S + \
+            self.alpha_att_val[1] * att_value_simi_matrix
 
         return self.S
-
 
     def train_embedding(self, embedding_model, refinement_model, source_A_hat, target_A_hat, structural_optimizer, source_A_hat_sym, target_A_hat_sym):
         for epoch in tqdm(range(self.args.emb_epochs)):
@@ -244,51 +248,194 @@ class EMGCN(NetworkAlignmentModel):
                 if i == 0:
                     A_hat_sym = source_A_hat_sym
                     outputs = embedding_model(source_A_hat, 's')[1:]
+                    # print(len(outputs))
                 else:
                     A_hat_sym = target_A_hat_sym
                     outputs = embedding_model(target_A_hat, 't')[1:]
-                loss = linkpred_loss_multiple_layer(outputs, A_hat_sym, self.args.cuda)
+                    # print(outputs)
+                loss = linkpred_loss_multiple_layer(
+                    outputs, A_hat_sym, self.args.cuda)
                 if self.args.log:
                     print("Loss: {:.4f}".format(loss.data))
                 loss.backward()
                 structural_optimizer.step()
-        print("Epoch time: {:.4f}".format(time.time() - start_time))            
+        print("Epoch time: {:.4f}".format(time.time() - start_time))
 
         print("Done structural training")
 
         embedding_model.eval()
-        print("Done embedding eval, get simi...")
         self.att_simi_matrix, self.value_simi_matrix = self.get_simi_att()
-        print("got simi")
         att_value_simi_matrix = self.att_simi_matrix + self.value_simi_matrix
         source_A_hat = source_A_hat.to_dense()
         target_A_hat = target_A_hat.to_dense()
         # refinement
-        print("refining..")
-        self.refine(embedding_model, refinement_model, source_A_hat, target_A_hat, att_value_simi_matrix)            
-        print("Done refine")
 
+        self.refine(embedding_model, refinement_model,
+                    source_A_hat, target_A_hat, att_value_simi_matrix)
 
-    def align(self):
+    """
+    incorporate supervised and unsupervised (train_data ground truth + EMGCN method)
+    """
+
+    def train_embedding_hybrid(self, embedding_model, refinement_model, source_A_hat, target_A_hat,
+                               structural_optimizer, source_A_hat_sym,
+                               target_A_hat_sym, train_data, loss_split):
+
+        t = len(train_data)
+        # k is the number of negative samples to generate per gt sample
+        k = 3
+
+        L = np.ones((t, k)) * train_data[:, 0].reshape((t, 1))
+        neg_left = L.reshape((t*k,))
+
+        for epoch in tqdm(range(self.args.emb_epochs)):
+            start_time = time.time()
+            print("Structure learning epoch: {}".format(epoch))
+
+            # from gcn align paper: generate new negative samples every 10 epochs
+            if epoch % 10 == 0:
+                neg_right = np.random.choice(train_data[:, 1], t * k)
+
+            structural_optimizer.zero_grad()
+            source_outputs = embedding_model(source_A_hat, 's')[1:]
+            target_outputs = embedding_model(target_A_hat, 't')[1:]
+
+            ''' Uncomment these  lines to use just last GCN layer for memory debugging'''
+            # source_outputs = embedding_model(source_A_hat, 's')[-1]
+            # target_outputs = embedding_model(target_A_hat, 't')[-1]
+
+            supervised_loss = supervised_loss_multiple_layer(
+                source_outputs, target_outputs, train_data, neg_left, neg_right, k, self.args.cuda)
+
+            # Only difference is we compute the loss + update gradient at the same time
+            # and not first doing source then target
+            source_unsupervised_loss = linkpred_loss_multiple_layer(
+                source_outputs, source_A_hat_sym, self.args.cuda)
+            target_unsupervised_loss = linkpred_loss_multiple_layer(
+                target_outputs, target_A_hat_sym, self.args.cuda)
+
+            loss = supervised_loss/2 + \
+                (source_unsupervised_loss + target_unsupervised_loss)/2
+            # TODO: Try new loss split
+            if False:
+                loss = loss_split * (supervised_loss/2) + (1 - loss_split) * \
+                    (source_unsupervised_loss + target_unsupervised_loss) / 2
+
+            print("Loss: {:.4f}".format(loss.data))
+            loss.backward()
+            structural_optimizer.step()
+            print("Epoch time: {:.4f}".format(time.time() - start_time))
+
+        print("Done structural training")
+
+        embedding_model.eval()
+        self.att_simi_matrix, self.value_simi_matrix = self.get_simi_att()
+        att_value_simi_matrix = self.att_simi_matrix + self.value_simi_matrix
+        source_A_hat = source_A_hat.to_dense()
+        target_A_hat = target_A_hat.to_dense()
+        # refinement
+
+        self.refine(embedding_model, refinement_model,
+                    source_A_hat, target_A_hat, att_value_simi_matrix)
+
+    """
+    added parameter for train_data ground truth
+    """
+
+    def train_embedding_supervised(self, embedding_model, refinement_model, source_A_hat, target_A_hat, structural_optimizer, train_data):
+
+        t = len(train_data)
+        # k is the number of negative samples to generate per gt sample
+        k = 3
+
+        L = np.ones((t, k)) * train_data[:, 0].reshape((t, 1))
+        neg_left = L.reshape((t*k,))
+
+        for epoch in tqdm(range(self.args.emb_epochs)):
+            start_time = time.time()
+            print("Structure learning epoch: {}".format(epoch))
+
+            # from gcn align paper: generate new negative samples every 10 epochs
+            if epoch % 10 == 0:
+                neg_right = np.random.choice(train_data[:, 1], t * k)
+
+            structural_optimizer.zero_grad()
+            source_outputs = embedding_model(source_A_hat, 's')[1:]
+            target_outputs = embedding_model(target_A_hat, 't')[1:]
+
+            ''' Uncomment these  lines to use just last GCN layer for memory debugging'''
+            # source_outputs = embedding_model(source_A_hat, 's')[-1]
+            # target_outputs = embedding_model(target_A_hat, 't')[-1]
+
+            loss = supervised_loss_multiple_layer(
+                source_outputs, target_outputs, train_data, neg_left, neg_right, k, self.args.cuda)
+            # if self.args.log:
+            #
+            print("Loss: {:.4f}".format(loss.data))
+            loss.backward()
+            structural_optimizer.step()
+        print("Epoch time: {:.4f}".format(time.time() - start_time))
+
+        print("Done structural training")
+
+        embedding_model.eval()
+        self.att_simi_matrix, self.value_simi_matrix = self.get_simi_att()
+        att_value_simi_matrix = self.att_simi_matrix + self.value_simi_matrix
+        source_A_hat = source_A_hat.to_dense()
+        target_A_hat = target_A_hat.to_dense()
+        # refinement
+
+        self.refine(embedding_model, refinement_model,
+                    source_A_hat, target_A_hat, att_value_simi_matrix)
+
+    """
+    Added train_data parameter to allow for supervised 
+    """
+
+    def align(self, train_data=None):
         source_A_hat, target_A_hat, source_feats, target_feats, source_A_hat_sym, target_A_hat_sym = self.get_elements()
 
+        # print(source_feats.size())
+
         embedding_model = EM_GCN(
-            activate_function = self.args.act,
-            num_GCN_blocks = self.args.num_GCN_blocks,
-            output_dim = self.args.embedding_dim,
-            num_source_nodes = self.n_node_s,
-            num_target_nodes = self.n_node_t,
-            source_feats = source_feats,
-            target_feats = target_feats,
-            direct= self.args.direct_adj,
+            activate_function=self.args.act,
+            num_GCN_blocks=self.args.num_GCN_blocks,
+            output_dim=self.args.embedding_dim,
+            num_source_nodes=self.n_node_s,
+            num_target_nodes=self.n_node_t,
+            source_feats=source_feats,
+            target_feats=target_feats,
+            direct=self.args.direct_adj,
         )
 
-        refinement_model = StableFactor(self.n_node_s, self.n_node_t, self.args.cuda)
+        refinement_model = StableFactor(
+            self.n_node_s, self.n_node_t, self.args.cuda)
 
         if self.args.cuda:
             embedding_model = embedding_model.cuda()
-        structural_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, embedding_model.parameters()), lr=self.args.lr)
+        structural_optimizer = torch.optim.Adam(filter(
+            lambda p: p.requires_grad, embedding_model.parameters()), lr=self.args.lr)
         embedding_model.train()
 
-        self.train_embedding(embedding_model, refinement_model, source_A_hat, target_A_hat, structural_optimizer, source_A_hat_sym, target_A_hat_sym)
+        """
+        train_data is ground truth samples
+        GCN-align paper uses SGD instead of Adam
+        """
+        if train_data is not None:
+            print("Supervised")
+            hybrid = True
+            loss_split = 0.2
+
+            if hybrid:
+                self.train_embedding_hybrid(embedding_model, refinement_model, source_A_hat,
+                                            target_A_hat, structural_optimizer, source_A_hat_sym, target_A_hat_sym,
+                                            train_data, loss_split)
+            else:
+                self.train_embedding_supervised(embedding_model, refinement_model, source_A_hat,
+                                                target_A_hat, structural_optimizer, train_data)
+        else:
+            self.train_embedding(embedding_model, refinement_model, source_A_hat,
+                                 target_A_hat, structural_optimizer, source_A_hat_sym, target_A_hat_sym)
+        """"""
+
         return self.S

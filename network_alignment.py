@@ -14,33 +14,41 @@ import pdb
 def parse_args():
     parser = argparse.ArgumentParser(description="Network alignment")
     parser.add_argument('--dataset_name', default="zh_en")
-    parser.add_argument('--source_dataset', default="data/networkx/zh_enDI/zh/graphsage/")
-    parser.add_argument('--target_dataset', default="data/networkx/zh_enDI/en/offline/graphsage/")
-    parser.add_argument('--groundtruth',    default="data/networkx/zh_enDI/dictionaries/groundtruth")
+    parser.add_argument('--source_dataset',
+                        default="data/networkx/zh_enDI/zh/graphsage/")
+    parser.add_argument('--target_dataset',
+                        default="data/networkx/zh_enDI/en/offline/graphsage/")
+    parser.add_argument(
+        '--groundtruth',    default="data/networkx/zh_enDI/dictionaries/groundtruth")
     parser.add_argument('--seed',           default=123,    type=int)
-    subparsers = parser.add_subparsers(dest="algorithm", help='Choose 1 of the algorithm from: EMGCN')
-    
+    subparsers = parser.add_subparsers(
+        dest="algorithm", help='Choose 1 of the algorithm from: EMGCN')
+
     # EMGCN
     parser_EMGCN = subparsers.add_parser("EMGCN", help="EMGCN algorithm")
-    
+
     # neverchange args
     parser_EMGCN.add_argument('--lr', default=0.01, type=float)
     parser_EMGCN.add_argument('--act', type=str, default='tanh')
-    parser_EMGCN.add_argument('--log', action="store_false", help="Just to print loss")
+    parser_EMGCN.add_argument(
+        '--log', action="store_false", help="Just to print loss")
     parser_EMGCN.add_argument('--cuda',                action="store_true")
     parser_EMGCN.add_argument('--sparse', action="store_true")
     parser_EMGCN.add_argument('--direct_adj', action="store_true")
     parser_EMGCN.add_argument('--num_GCN_blocks', type=int, default=2)
-    parser_EMGCN.add_argument('--embedding_dim',       default=200,         type=int)
+    parser_EMGCN.add_argument('--embedding_dim',
+                              default=200,         type=int)
     parser_EMGCN.add_argument('--emb_epochs',    default=200,        type=int)
 
     # often change
     parser_EMGCN.add_argument('--refinement_epochs', default=10, type=int)
-    parser_EMGCN.add_argument('--threshold_refine', type=float, default=0.94, help="The threshold value to get stable candidates")
+    parser_EMGCN.add_argument('--threshold_refine', type=float,
+                              default=0.94, help="The threshold value to get stable candidates")
     parser_EMGCN.add_argument('--point', type=float, default=1.01)
     parser_EMGCN.add_argument('--rel', type=float, default=1)
     parser_EMGCN.add_argument('--att', type=float, default=0.25)
-    parser_EMGCN.add_argument('--attval', type=float, default=0.25) # what is this
+    parser_EMGCN.add_argument('--attval', type=float,
+                              default=0.25)  # what is this
     # often change
     parser_EMGCN.add_argument('--num_each_refine', type=int, default=100)
 
@@ -56,7 +64,28 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     source_dataset = Dataset(args.source_dataset, args.dataset_name)
     target_dataset = Dataset(args.target_dataset)
-    groundtruth = graph_utils.load_gt(args.groundtruth, source_dataset.id2idx, target_dataset.id2idx, 'dict')
+    groundtruth = graph_utils.load_gt(
+        args.groundtruth, source_dataset.id2idx, target_dataset.id2idx, 'dict')
+
+    # print(len(groundtruth))
+    # for key in list(groundtruth.keys()):
+    #     if key != groundtruth[key]:
+    #         print(key, groundtruth[key])
+    """
+    These lines split groundtruth into train (np.array) and test (dictionary)
+    """
+    train_test_split = 0.3
+    L = len(groundtruth)
+
+    gt = np.array(list(groundtruth.keys()))
+    np.random.shuffle(gt)
+    train = gt[: int(train_test_split * L)]
+    test = gt[int(train_test_split * L):]
+    train_data = np.array([np.array([k, groundtruth[k]]) for k in train])
+    # print(train_data.shape)
+    groundtruth = {k: groundtruth[k] for k in test}
+    # print(len(groundtruth))
+    """"""
 
     algorithm = args.algorithm
 
@@ -65,10 +94,10 @@ if __name__ == '__main__':
     else:
         raise Exception("Unsupported algorithm")
 
-    S = model.align()
+    S = model.align(train_data)  # here
 
     for i in range(2):
-        if i == 1: 
+        if i == 1:
             print("right to left...")
         else:
             print("left to right...")
@@ -80,5 +109,4 @@ if __name__ == '__main__':
         print("Full_time: {:.4f}".format(time() - start_time))
 
         S = S.T
-        groundtruth = {v:k for k, v in groundtruth.items()}
-
+        groundtruth = {v: k for k, v in groundtruth.items()}

@@ -17,9 +17,11 @@ def init_weight(modules, activation):
     for m in modules:
         if isinstance(m, nn.Linear):
             if activation is None:
-                m.weight.data = init.xavier_uniform_(m.weight.data) #, gain=nn.init.calculate_gain(activation.lower()))
+                # , gain=nn.init.calculate_gain(activation.lower()))
+                m.weight.data = init.xavier_uniform_(m.weight.data)
             else:
-                m.weight.data = init.xavier_uniform_(m.weight.data, gain=nn.init.calculate_gain(activation.lower()))
+                m.weight.data = init.xavier_uniform_(
+                    m.weight.data, gain=nn.init.calculate_gain(activation.lower()))
             if m.bias is not None:
                 m.bias.data = init.constant_(m.bias.data, 0.0)
 
@@ -35,6 +37,9 @@ def get_act_function(activate_function):
         activate_function = nn.ReLU()
     elif activate_function == 'tanh':
         activate_function = nn.Tanh()
+    elif activate_function == 'leaky_relu':
+        activate_function = nn.LeakyReLU(0.1)
+        # activate_function = nn.LeakyRelu(0.01)
     else:
         return None
     return activate_function
@@ -56,7 +61,8 @@ def get_acc(source_outputs, target_outputs, alphas=None, att_simi=None, value_si
     alphas = alphas / alphas.sum()
     accs = ""
     for i in range(0, len(source_outputs)):
-        S = torch.matmul(F.normalize(source_outputs[i]), F.normalize(target_outputs[i]).t())
+        S = torch.matmul(F.normalize(
+            source_outputs[i]), F.normalize(target_outputs[i]).t())
         S_numpy = S.detach().cpu().numpy()
         if test_dict is not None:
             acc = get_statistics(S_numpy, test_dict)
@@ -67,7 +73,8 @@ def get_acc(source_outputs, target_outputs, alphas=None, att_simi=None, value_si
             Sf += S_numpy
     Sori = Sf + 0
     if att_simi is not None:
-        Sf = alpha_att_val[0] * Sf + alpha_att_val[1] * att_simi + alpha_att_val[2] * value_simi
+        Sf = alpha_att_val[0] * Sf + alpha_att_val[1] * \
+            att_simi + alpha_att_val[2] * value_simi
     if test_dict is not None:
         acc = get_statistics(Sf, test_dict)
         accs += "Final acc is: {:.4f}".format(acc)
@@ -79,7 +86,7 @@ def Laplacian_graph(A):
         A[i, i] = 1
     A = torch.FloatTensor(A)
     D_ = torch.diag(torch.sum(A, 0)**(-0.5))
-    A_hat = torch.matmul(torch.matmul(D_,A),D_)
+    A_hat = torch.matmul(torch.matmul(D_, A), D_)
     A_hat = A_hat.float()
     return A_hat
 
@@ -116,11 +123,13 @@ def normalize_numpy(matrix):
     matrix[where_matrix_nan] = 0
     return matrix
 
+
 def get_numpy_simi_matrix(source, target):
     # normalize
     source = normalize_numpy(source)
     target = normalize_numpy(target)
     return source.dot(target.T)
+
 
 def get_similarity_matrices(source_outputs, target_outputs):
     """
@@ -132,10 +141,12 @@ def get_similarity_matrices(source_outputs, target_outputs):
     for i in range(len(source_outputs)):
         source_output_i = source_outputs[i]
         target_output_i = target_outputs[i]
-        S = torch.mm(F.normalize(source_output_i), F.normalize(target_output_i).t())
+        S = torch.mm(F.normalize(source_output_i),
+                     F.normalize(target_output_i).t())
         S = S.detach().cpu().numpy()
         list_S.append(S)
     return list_S
+
 
 def get_cosine(vec1, vec2):
     if vec1.sum() == 0 or vec2.sum() == 0:
@@ -144,30 +155,95 @@ def get_cosine(vec1, vec2):
     vec2 = vec2 / np.sqrt((vec2 ** 2).sum())
     return (vec1 * vec2).sum()
 
+
 def get_dict_from_S(S, source_id2idx, target_id2idx):
     target = np.argmax(S, axis=1)
-    idx2id_source = {v:k for k, v in source_id2idx.items()}
-    idx2id_target = {v:k for k, v in target_id2idx.items()}
-    dictt = {idx2id_source[i]: idx2id_target[target[i]] for i in range(S.shape[0])}
+    idx2id_source = {v: k for k, v in source_id2idx.items()}
+    idx2id_target = {v: k for k, v in target_id2idx.items()}
+    dictt = {idx2id_source[i]: idx2id_target[target[i]]
+             for i in range(S.shape[0])}
     return dictt
 
-#modify
+
 def linkpred_loss(embedding, A, i, cuda):
     pred_adj = torch.matmul(F.normalize(embedding), F.normalize(embedding).t())
     if cuda:
-        pred_adj = F.normalize((torch.min(pred_adj, torch.Tensor([1]).cuda())), dim = 1) #A
+        pred_adj = F.normalize(
+            (torch.min(pred_adj, torch.Tensor([1]).cuda())), dim=1)
     else:
-        pred_adj = F.normalize((torch.min(pred_adj, torch.Tensor([1]))), dim = 1)
-    linkpred_losss = (pred_adj -  A ) ** 2 #D^-1/2
+        pred_adj = F.normalize((torch.min(pred_adj, torch.Tensor([1]))), dim=1)
+    linkpred_losss = (pred_adj - A) ** 2
     linkpred_losss = linkpred_losss.sum() / A.shape[1]
     return linkpred_losss
 
+
 def linkpred_loss_multiple_layer(outputs, A_hat, cuda):
-    count = 0 
+    count = 0
     loss = 0
     for i in range(1, len(outputs)):
         loss += linkpred_loss(outputs[i], A_hat, i, cuda)
         count += 1
-    loss = loss / count 
+    loss = loss / count
     return loss
 
+# def supervised_loss(source_embedding, target_embedding, train_data, neg_left, neg_right, i, cuda):
+#     left = train_data[:,0]
+#     right = train_data[:,1]
+#     t = len(train_data)
+#     k = 5
+
+#     left_x = source_embedding[left,:]
+#     right_x = target_embedding[right,:]
+#     A = torch.abs(left_x - right_x).sum(axis=1)
+
+#     neg_left_x = source_embedding[neg_left,:]
+#     neg_right_x = source_embedding[neg_right,:]
+#     B = torch.abs(neg_left_x - neg_right_x).sum(axis=1)
+#     C = -B.reshape((t,k))
+#     D = A + 3
+
+#     act = nn.ReLU()
+#     L1 = act(C + D.reshape((t, 1)))
+#     loss = torch.sum(L1) / (t * k)
+#     return loss
+
+
+"""
+added this method for supervised loss
+"""
+
+
+def supervised_loss_multiple_layer(source_outputs, target_outputs, train_data, neg_left, neg_right, k, cuda):
+    count = 0
+    loss = 0
+    # left: source vertices from gt pairs
+    left = train_data[:, 0]
+    # right: target vertices from gt pairs
+    right = train_data[:, 1]
+    t = len(train_data)
+
+    for i in range(1, len(source_outputs)):
+        # loss += supervised_loss(source_outputs[i], target_outputs[i], train_data, neg_left, neg_right, i, cuda)
+
+        source_embedding = source_outputs[i]
+        target_embedding = target_outputs[i]
+
+        left_x = source_embedding[left, :]
+        right_x = target_embedding[right, :]
+        A = torch.abs(left_x - right_x).sum(axis=1)
+
+        neg_left_x = source_embedding[neg_left, :]
+        neg_right_x = source_embedding[neg_right, :]
+        B = torch.abs(neg_left_x - neg_right_x).sum(axis=1)
+        C = -B.reshape((t, k))
+        D = A + 3
+
+        act = nn.ReLU()
+        L1 = act(C + D.reshape((t, 1)))
+        loss_term = torch.sum(L1) / (t * k)
+
+        loss += loss_term
+        count += 1
+
+    loss = loss / count
+    return loss
