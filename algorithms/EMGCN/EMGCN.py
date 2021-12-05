@@ -417,7 +417,7 @@ class EMGCN(NetworkAlignmentModel):
         attention = self.args.attention
     
         if attention:
-            print("using new attention network, setting refine epochs to 0")
+            print("using new attention network")#, setting refine epochs to 0")
             #self.args.refinement_epochs = 0
             embedding_model = GAT(
                 activate_function=self.args.act,

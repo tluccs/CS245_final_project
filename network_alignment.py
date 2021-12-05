@@ -52,6 +52,7 @@ def parse_args():
     # often change
     parser_EMGCN.add_argument('--num_each_refine', type=int, default=100)
     parser_EMGCN.add_argument('--attention', type=int, default=0)
+    parser_EMGCN.add_argument('--word_embedding', type=int, default=0)
 
     return parser.parse_args()
 
@@ -63,8 +64,11 @@ if __name__ == '__main__':
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    source_dataset = Dataset(args.source_dataset, args.dataset_name)
-    target_dataset = Dataset(args.target_dataset)
+    word_embedding = args.word_embedding > 0
+    bert = args.word_embedding == 1
+    print("use word embedding:", word_embedding)
+    source_dataset = Dataset(args.source_dataset, args.dataset_name, use_word_embeddings=word_embedding, bert=bert)
+    target_dataset = Dataset(args.target_dataset, use_word_embeddings=word_embedding, bert=bert)
     groundtruth = graph_utils.load_gt(
         args.groundtruth, source_dataset.id2idx, target_dataset.id2idx, 'dict')
 

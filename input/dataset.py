@@ -16,6 +16,8 @@ from numpy import *
 
 from numpy import unravel_index
 
+from transformers import BertTokenizer, BertModel, BertConfig
+
 class Dataset:
     """
     this class receives input from graphsage format with predefined folder structure, the data folder must contains these files:
@@ -24,10 +26,11 @@ class Dataset:
     Arguments:
     - data_dir: Data directory which contains files mentioned above.
     """
-
-    def __init__(self, data_dir, dt_name="", demo=False, use_word_embeddings=False, noise="", noise_level=0):
+ 
+    def __init__(self, data_dir, dt_name="", demo=False, use_word_embeddings=False, noise="", noise_level=0, bert=False):
         self.data_dir = data_dir
         self.dt_name = dt_name
+        self.bert = bert
         if not demo:
             self.noise = noise
             self.nodes_to_del = []
@@ -54,7 +57,10 @@ class Dataset:
             self.glove = "data/sub.glove.300d"
             if use_word_embeddings:
                 self.words = self.create_dictionaries()
-                self.embedder = self.get_embedder()
+                if self.bert:
+                    self.embedder = self.get_bert_embedder()
+                else:
+                    self.embedder = self.get_embedder()
         else:
             self.dt_name_path = ""
         
@@ -346,6 +352,46 @@ class Dataset:
         return words
 
 
+    def get_bert_embedder(self):
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        config = BertConfig.from_pretrained('bert-base-uncased', output_hidden_states=True)
+        bert_model = BertModel.from_pretrained('bert-base-uncased', config=config)
+        bert_model.eval()
+        
+        start_time = time.time()
+        word_embedder = {}
+        word_count = 0
+        n_words = len(self.words)
+        with torch.no_grad():
+            
+            for word in self.words:
+                word_count += 1
+                if (word_count % 100) == 0:
+                    print(word_count, "/", n_words)
+                        
+                try:
+                    #try bert stuff
+                    tokenized_text = tokenizer.tokenize(word)
+                    indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
+                    tokens_tensor = torch.tensor([indexed_tokens])
+                    outputs = bert_model(tokens_tensor)
+                    # can use last hidden state as word embeddings
+                    last_hidden_state = outputs[0]
+                    word_embed = last_hidden_state[0][0] #batch=0, word in sent=0
+                    word_embedder[word] = np.array(word_embed)
+                except:
+                    #if not, random
+                    print("word", word, " rand init")
+                    word_embedder[word] = np.random.normal(-0.03, 0.4, 768)
+
+
+        available_words = set(list(word_embedder.keys()))
+        for word in self.words:
+            if word not in available_words:
+                word_embedder[word] = np.random.normal(-0.03, 0.4, 300)
+        print("Getting embedder time: {:.4f}".format(time.time() - start_time))        
+        return word_embedder
+
     def get_embedder(self):
         # load glove file
         print("Getting word embedder")
@@ -369,6 +415,7 @@ class Dataset:
             if word not in available_words:
                 word_embedder[word] = np.random.normal(-0.03, 0.4, 300)
         print("Getting embedder time: {:.4f}".format(time.time() - start_time))
+        
         return word_embedder
     
 
