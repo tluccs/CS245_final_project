@@ -51,6 +51,7 @@ def parse_args():
                               default=0.25)  # what is this
     # often change
     parser_EMGCN.add_argument('--num_each_refine', type=int, default=100)
+    parser_EMGCN.add_argument('--attention', type=int, default=0)
 
     return parser.parse_args()
 

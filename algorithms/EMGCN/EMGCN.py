@@ -1,5 +1,5 @@
 import os
-from algorithms.EMGCN.embedding_model import EM_GCN
+from algorithms.EMGCN.embedding_model import EM_GCN, GAT
 from algorithms.EMGCN.stable_factor import StableFactor
 from algorithms.network_alignment_model import NetworkAlignmentModel
 
@@ -118,7 +118,11 @@ class EMGCN(NetworkAlignmentModel):
     def get_simi_att(self):
         simi = np.zeros((self.n_node_s, self.n_node_t))
         value_simi = np.zeros((self.n_node_s, self.n_node_t))
+        i = 0
         for snode in tqdm(self.source_att_value):
+            i += 1
+            if i > 100 and self.args.emb_epochs <= 1 and self.args.refinement_epochs <= 1:
+                break
             # print('snode', snode)
             if len(self.source_att_value[snode]['att']) == 0:
                 continue
@@ -202,10 +206,13 @@ class EMGCN(NetworkAlignmentModel):
 
     def refine(self, embedding_model, refinement_model, source_A_hat, target_A_hat, att_value_simi_matrix):
         # INIT BEFORE LOOP
+
+        embedding_model.eval() #stops runtimeerror ... cpu backend
+
         source_outputs = embedding_model(source_A_hat, 's')
         target_outputs = embedding_model(target_A_hat, 't')
         acc, self.S, _ = get_acc(source_outputs, target_outputs, self.alphas)
-        print("ACC: ".format(acc))
+        print("ACC: {}".format(acc))
 
         dictt = get_dict_from_S(
             self.S, self.source_dataset.id2idx, self.target_dataset.id2idx)
@@ -219,10 +226,18 @@ class EMGCN(NetworkAlignmentModel):
             refinement_model.alpha_source[source_candidates] *= self.args.point
             refinement_model.alpha_target[target_candidates] *= self.args.point
 
-            X = refinement_model(source_A_hat, 's')
-            source_outputs = embedding_model(X, 's')
-            X = refinement_model(target_A_hat, 't')
-            target_outputs = embedding_model(X, 't')
+            if not self.args.attention:
+                X = refinement_model(source_A_hat, 's')
+                source_outputs = embedding_model(X, 's')
+                X = refinement_model(target_A_hat, 't')
+                target_outputs = embedding_model(X, 't')
+            else:
+                #problem is there is a bug somewhere so that dense matrices do not process in emb_model
+                #but sparse do not work in refinement model...
+                X = refinement_model(source_A_hat.to_dense(), 's')
+                source_outputs = embedding_model(X.to_sparse(), 's')
+                X = refinement_model(target_A_hat.to_dense(), 't')
+                target_outputs = embedding_model(X.to_sparse(), 't')
 
             acc, S, _ = get_acc(source_outputs, target_outputs, self.alphas)
             print(acc)
@@ -266,8 +281,9 @@ class EMGCN(NetworkAlignmentModel):
         embedding_model.eval()
         self.att_simi_matrix, self.value_simi_matrix = self.get_simi_att()
         att_value_simi_matrix = self.att_simi_matrix + self.value_simi_matrix
-        source_A_hat = source_A_hat.to_dense()
-        target_A_hat = target_A_hat.to_dense()
+        if not self.args.attention:
+            source_A_hat = source_A_hat.to_dense()
+            target_A_hat = target_A_hat.to_dense()
         # refinement
 
         self.refine(embedding_model, refinement_model,
@@ -331,8 +347,9 @@ class EMGCN(NetworkAlignmentModel):
         embedding_model.eval()
         self.att_simi_matrix, self.value_simi_matrix = self.get_simi_att()
         att_value_simi_matrix = self.att_simi_matrix + self.value_simi_matrix
-        source_A_hat = source_A_hat.to_dense()
-        target_A_hat = target_A_hat.to_dense()
+        if not self.args.attention:
+            source_A_hat = source_A_hat.to_dense()
+            target_A_hat = target_A_hat.to_dense()
         # refinement
 
         self.refine(embedding_model, refinement_model,
@@ -381,8 +398,9 @@ class EMGCN(NetworkAlignmentModel):
         embedding_model.eval()
         self.att_simi_matrix, self.value_simi_matrix = self.get_simi_att()
         att_value_simi_matrix = self.att_simi_matrix + self.value_simi_matrix
-        source_A_hat = source_A_hat.to_dense()
-        target_A_hat = target_A_hat.to_dense()
+        if not self.args.attention:
+            source_A_hat = source_A_hat.to_dense()
+            target_A_hat = target_A_hat.to_dense()
         # refinement
 
         self.refine(embedding_model, refinement_model,
@@ -396,17 +414,32 @@ class EMGCN(NetworkAlignmentModel):
         source_A_hat, target_A_hat, source_feats, target_feats, source_A_hat_sym, target_A_hat_sym = self.get_elements()
 
         # print(source_feats.size())
-
-        embedding_model = EM_GCN(
-            activate_function=self.args.act,
-            num_GCN_blocks=self.args.num_GCN_blocks,
-            output_dim=self.args.embedding_dim,
-            num_source_nodes=self.n_node_s,
-            num_target_nodes=self.n_node_t,
-            source_feats=source_feats,
-            target_feats=target_feats,
-            direct=self.args.direct_adj,
-        )
+        attention = self.args.attention
+    
+        if attention:
+            print("using new attention network, setting refine epochs to 0")
+            #self.args.refinement_epochs = 0
+            embedding_model = GAT(
+                activate_function=self.args.act,
+                num_GCN_blocks=self.args.num_GCN_blocks,
+                output_dim=self.args.embedding_dim,
+                num_source_nodes=self.n_node_s,
+                num_target_nodes=self.n_node_t,
+                source_feats=source_feats,
+                target_feats=target_feats,
+                direct=self.args.direct_adj,
+            )
+        else:
+            embedding_model = EM_GCN(
+                activate_function=self.args.act,
+                num_GCN_blocks=self.args.num_GCN_blocks,
+                output_dim=self.args.embedding_dim,
+                num_source_nodes=self.n_node_s,
+                num_target_nodes=self.n_node_t,
+                source_feats=source_feats,
+                target_feats=target_feats,
+                direct=self.args.direct_adj,
+            )
 
         refinement_model = StableFactor(
             self.n_node_s, self.n_node_t, self.args.cuda)
