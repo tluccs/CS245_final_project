@@ -1,5 +1,13 @@
 CS 245 project on entity alignment.
 
+Results:
+![Alt text](results/act.jpg?raw=true "Activation")
+![Alt text](results/word_embed.jpg?raw=true "Word Embedding")
+![Alt text](results/loss.jpg?raw=true "Loss")
+![Alt text](results/fc_cosine.jpg?raw=true "FC layer and Cosine similarity")
+![Alt text](results/attention.jpg?raw=true "Attention")
+
+
 ADAPTED FROM
 # EMGCN
 Code of the paper: ***Entity Alignment for Knowledge Graphs with Multi-order Convolutional Networks***.
