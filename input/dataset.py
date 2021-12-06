@@ -388,7 +388,7 @@ class Dataset:
         available_words = set(list(word_embedder.keys()))
         for word in self.words:
             if word not in available_words:
-                word_embedder[word] = np.random.normal(-0.03, 0.4, 300)
+                word_embedder[word] = np.random.normal(-0.03, 0.4, 768)
         print("Getting embedder time: {:.4f}".format(time.time() - start_time))        
         return word_embedder
 
@@ -618,6 +618,38 @@ class Dataset:
             return 0
         return len(source_set.intersection(target_set)) / len(source_set.union(target_set))
     
+    #take sets of words, embed words, and then compute similarity by clustering
+    def embedded_word_simi(self, source_set, target_set):
+        #REMEMBER TO USE word_embedding X for this
+        source_embed = []
+        target_embed = []
+        for word in source_set:
+            try:
+                embed = self.embedder[word]
+                source_embed.append(embed)
+            except:
+                pass
+        for word in target_set:
+            try:
+                embed = self.embedder[word]
+                target_embed.append(embed)
+            except:
+                pass
+        
+        #now have two sets of embeddings.
+        #for each in source, find nearest neighbor in target, add up distances + normalise
+        s = 0
+        for se in source_embed:
+            best_d = None
+            for te in target_embed:
+                d = np.linalg.norm(se - te)
+                if best_d is None or best_d > d:
+                    best_d = d
+            if best_d is not None:
+                s += best_d
+        if s != 0:
+            s /= len(source_embed)
+        return s
 
     def preprocess_value(self, value):
         final_val = set()

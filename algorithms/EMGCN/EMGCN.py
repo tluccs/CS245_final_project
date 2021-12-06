@@ -121,6 +121,7 @@ class EMGCN(NetworkAlignmentModel):
         i = 0
         for snode in tqdm(self.source_att_value):
             i += 1
+            #if we're testing
             if i > 100 and self.args.emb_epochs <= 1 and self.args.refinement_epochs <= 1:
                 break
             # print('snode', snode)
@@ -128,6 +129,7 @@ class EMGCN(NetworkAlignmentModel):
                 continue
             snode_index = self.source_dataset.id2idx[snode]
             snode_att = self.source_att_value[snode]['att']
+            #breakpoint()
             for tnode in self.target_att_value:
                 if len(self.target_att_value[tnode]['att']) == 0:
                     continue
@@ -138,12 +140,13 @@ class EMGCN(NetworkAlignmentModel):
                 for ele in common_att:
                     source_values = self.source_att_value[snode]['att_value'][ele]
                     target_values = self.target_att_value[tnode]['att_value'][ele]
-                    value_simi_this += self.source_dataset.jaccard_simi(
+                    value_simi_this += self.source_dataset.embedded_word_simi(
                         source_values, target_values)
                 if value_simi_this > 0:
                     value_simi_this /= len(common_att)
                 value_simi[snode_index, tnode_index] = value_simi_this
-                simi[snode_index, tnode_index] = self.source_dataset.jaccard_simi(
+                #attribute similarity matrix is simi
+                simi[snode_index, tnode_index] = self.source_dataset.embedded_word_simi(
                     snode_att, tnode_att)
         return simi, value_simi
 
