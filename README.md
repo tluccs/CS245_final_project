@@ -1,6 +1,9 @@
 CS 245 project on entity alignment.
 
 Results:
+
+
+
 ![Alt text](results/act.jpg?raw=true "Activation")
 ![Alt text](results/word_embed.jpg?raw=true "Word Embedding")
 ![Alt text](results/loss.jpg?raw=true "Loss")
