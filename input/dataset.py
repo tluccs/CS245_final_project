@@ -648,7 +648,8 @@ class Dataset:
             if best_d is not None:
                 s += best_d
         if s != 0:
-            s /= len(source_embed)
+            s = s/len(source_embed)
+            s = 1/s #close embedding yields larger s
         return s
 
     def preprocess_value(self, value):
