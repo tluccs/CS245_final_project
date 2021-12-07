@@ -121,7 +121,7 @@ class EMGCN(NetworkAlignmentModel):
         i = 0
         for snode in tqdm(self.source_att_value):
             i += 1
-            #if we're testing
+            # if we're testing
             if i > 100 and self.args.emb_epochs <= 1 and self.args.refinement_epochs <= 1:
                 break
             # print('snode', snode)
@@ -129,13 +129,17 @@ class EMGCN(NetworkAlignmentModel):
                 continue
             snode_index = self.source_dataset.id2idx[snode]
             snode_att = self.source_att_value[snode]['att']
-            #breakpoint()
+            # breakpoint()
             for tnode in self.target_att_value:
                 if len(self.target_att_value[tnode]['att']) == 0:
                     continue
                 tnode_index = self.target_dataset.id2idx[tnode]
                 tnode_att = self.target_att_value[tnode]['att']
                 common_att = snode_att.intersection(tnode_att)
+                # TODO: Modify the tradeoff from 0.5 to 0.2 and 0.8 ...
+                tradeoff = 0.5
+                common_att = self.source_dataset.cluster_common_attributes(
+                    snode_att, tnode_att, common_att, tradeoff)
                 value_simi_this = 0
                 for ele in common_att:
                     source_values = self.source_att_value[snode]['att_value'][ele]
@@ -145,7 +149,7 @@ class EMGCN(NetworkAlignmentModel):
                 if value_simi_this > 0:
                     value_simi_this /= len(common_att)
                 value_simi[snode_index, tnode_index] = value_simi_this
-                #attribute similarity matrix is simi
+                # attribute similarity matrix is simi
                 simi[snode_index, tnode_index] = self.source_dataset.embedded_word_simi(
                     snode_att, tnode_att)
         return simi, value_simi
@@ -210,7 +214,7 @@ class EMGCN(NetworkAlignmentModel):
     def refine(self, embedding_model, refinement_model, source_A_hat, target_A_hat, att_value_simi_matrix):
         # INIT BEFORE LOOP
 
-        embedding_model.eval() #stops runtimeerror ... cpu backend
+        embedding_model.eval()  # stops runtimeerror ... cpu backend
 
         source_outputs = embedding_model(source_A_hat, 's')
         target_outputs = embedding_model(target_A_hat, 't')
@@ -235,8 +239,8 @@ class EMGCN(NetworkAlignmentModel):
                 X = refinement_model(target_A_hat, 't')
                 target_outputs = embedding_model(X, 't')
             else:
-                #problem is there is a bug somewhere so that dense matrices do not process in emb_model
-                #but sparse do not work in refinement model...
+                # problem is there is a bug somewhere so that dense matrices do not process in emb_model
+                # but sparse do not work in refinement model...
                 X = refinement_model(source_A_hat.to_dense(), 's')
                 source_outputs = embedding_model(X.to_sparse(), 's')
                 X = refinement_model(target_A_hat.to_dense(), 't')
@@ -418,9 +422,10 @@ class EMGCN(NetworkAlignmentModel):
 
         # print(source_feats.size())
         attention = self.args.attention
-    
+
         if attention:
-            print("using new attention network")#, setting refine epochs to 0")
+            # , setting refine epochs to 0")
+            print("using new attention network")
             #self.args.refinement_epochs = 0
             embedding_model = GAT(
                 activate_function=self.args.act,

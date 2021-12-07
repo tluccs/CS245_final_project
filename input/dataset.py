@@ -18,6 +18,7 @@ from numpy import unravel_index
 
 from transformers import BertTokenizer, BertModel, BertConfig
 
+
 class Dataset:
     """
     this class receives input from graphsage format with predefined folder structure, the data folder must contains these files:
@@ -26,7 +27,7 @@ class Dataset:
     Arguments:
     - data_dir: Data directory which contains files mentioned above.
     """
- 
+
     def __init__(self, data_dir, dt_name="", demo=False, use_word_embeddings=False, noise="", noise_level=0, bert=False):
         self.data_dir = data_dir
         self.dt_name = dt_name
@@ -50,8 +51,10 @@ class Dataset:
 
         if self.dt_name != "":
             self.dt_name_path = "data/{}".format(self.dt_name)
-            self.ent_att_val1 = os.path.join(self.dt_name_path, "ent_att_val_1")
-            self.ent_att_val2 = os.path.join(self.dt_name_path, "ent_att_val_2")
+            self.ent_att_val1 = os.path.join(
+                self.dt_name_path, "ent_att_val_1")
+            self.ent_att_val2 = os.path.join(
+                self.dt_name_path, "ent_att_val_2")
             self.index_att_1 = os.path.join(self.dt_name_path, "index_att_1")
             self.index_att_2 = os.path.join(self.dt_name_path, "index_att_2")
             self.glove = "data/sub.glove.300d"
@@ -63,7 +66,6 @@ class Dataset:
                     self.embedder = self.get_embedder()
         else:
             self.dt_name_path = ""
-        
 
     def get_noise_data(self, noise, noise_level):
         print("Loading noise info")
@@ -71,7 +73,8 @@ class Dataset:
             noisex = "del_node"
         else:
             noisex = noise
-        data_path = os.path.join("data", noise, "{}_{}_{}".format(self.dt_name, noisex, noise_level))
+        data_path = os.path.join("data", noise, "{}_{}_{}".format(
+            self.dt_name, noisex, noise_level))
         if noise == "del_edges":
             with open(data_path, "r", encoding="utf-8") as file:
                 for line in file:
@@ -87,7 +90,6 @@ class Dataset:
                     if node not in self.nodes_to_del:
                         self.nodes_to_del.append(node)
         print("DONE loading noise info")
-                    
 
     def get_att_dict(self, path):
         att_dict = {}
@@ -102,7 +104,6 @@ class Dataset:
         dict1 = self.get_att_dict(self.index_att_1)
         dict2 = self.get_att_dict(self.index_att_2)
         return dict1, dict2
-
 
     def _load_G(self):
         G_data = json.load(open(os.path.join(self.data_dir, "G.json")))
@@ -125,7 +126,6 @@ class Dataset:
             mapping = {k: str(k) for k in self.G.nodes()}
             self.G = nx.relabel_nodes(self.G, mapping)
 
-
     def _load_id2idx(self):
         id2idx_file = os.path.join(self.data_dir, 'id2idx.json')
         conversion = type(self.G.nodes()[0])
@@ -134,10 +134,10 @@ class Dataset:
         for k, v in id2idx.items():
             self.id2idx[conversion(k)] = v
         if self.noise != "":
-            self.new_id2idx = {node: i for i, node in enumerate(self.G.nodes())}
+            self.new_id2idx = {node: i for i,
+                               node in enumerate(self.G.nodes())}
         else:
             self.new_id2idx = self.id2idx
-
 
     def _load_features(self):
         self.features = None
@@ -148,16 +148,16 @@ class Dataset:
             self.features = None
 
         if len(self.new_id2idx) != len(self.id2idx):
-            self.new_features = np.zeros((len(self.new_id2idx), self.features.shape[1]))
-            self.new_idx2id = {v:k for k,v in self.new_id2idx.items()}
+            self.new_features = np.zeros(
+                (len(self.new_id2idx), self.features.shape[1]))
+            self.new_idx2id = {v: k for k, v in self.new_id2idx.items()}
             for i in range(len(self.new_features)):
                 self.new_features[i] = self.features[self.id2idx[self.new_idx2id[i]]]
             self.features = self.new_features
         return self.features
 
-
     def load_edge_features(self):
-        self.edge_features= None
+        self.edge_features = None
         feats_path = os.path.join(self.data_dir, 'edge_feats.mat')
         if os.path.isfile(feats_path):
             edge_feats = loadmat(feats_path)['edge_feats']
@@ -170,22 +170,17 @@ class Dataset:
             self.edge_features = None
         return self.edge_features
 
-
     def get_adjacency_matrix(self, sparse=False):
         return self.construct_adjacency(self.G, sparse=False)
-
 
     def get_nodes_degrees(self):
         return graph_utils.build_degrees(self.G, self.id2idx)
 
-
     def get_nodes_clustering(self):
         return graph_utils.build_clustering(self.G, self.id2idx)
 
-
     def get_edges(self):
         return graph_utils.get_edges(self.G, self.id2idx)
-
 
     def check_id2idx(self):
         for i, node in enumerate(self.G.nodes()):
@@ -193,7 +188,6 @@ class Dataset:
                 print("Failed at node %s" % str(node))
                 return False
         return True
-
 
     def normalize_adj(self, adj, rowsum, sparse=False):
         """Symmetrically normalize adjacency matrix."""
@@ -210,12 +204,11 @@ class Dataset:
         else:
             return (d_mat_inv_sqrt.dot(adj)).dot(d_mat_inv_sqrt).tocoo(), deg_out, deg_in
 
-
     def preprocess_adj(self, adj, sparse, rowsum):
         """Preprocessing of adjacency matrix for simple GCN model and conversion to tuple representation."""
-        adj_normalized, deg_out, deg_in = self.normalize_adj(adj + sp.eye(adj.shape[0]), rowsum, sparse)
+        adj_normalized, deg_out, deg_in = self.normalize_adj(
+            adj + sp.eye(adj.shape[0]), rowsum, sparse)
         return adj_normalized
-
 
     def construct_adjacency(self, G, sparse=False, direct=False, typee='old'):
         adj = nx.to_scipy_sparse_matrix(G)
@@ -233,12 +226,10 @@ class Dataset:
             adj = adj.tocoo()
         return adj, rowsum
 
-
     def construct_laplacian(self, sparse=False, direct=False, typee='old'):
         G = self.G
         adj, rowsum = self.construct_adjacency(G, sparse, direct, typee)
         return self.preprocess_adj(adj, sparse, rowsum)
-
 
     def cv_coo_sparse(self, coo):
         values = coo.data
@@ -249,14 +240,12 @@ class Dataset:
         shape = coo.shape
         return torch.sparse.FloatTensor(i, v, torch.Size(shape))
 
-
     def refine_matrix_product(self, A, D):
         """
         A is coo matrix
         D is coo matrix
         """
         return (D.dot(A)).dot(D)
-
 
     def clean_string(self, string):
         """
@@ -270,7 +259,6 @@ class Dataset:
                     continue
             cleaned_string += char
         return cleaned_string
-
 
     def words_of_string(self, string):
         """
@@ -292,7 +280,6 @@ class Dataset:
 
         return words_set
 
-
     def create_dictionaries(self):
         start_time = time.time()
         if self.dt_name_path == "":
@@ -310,7 +297,7 @@ class Dataset:
                 words_set = self.words_of_string(data_line[1])
                 words.update(words_set)
         print("Number of unique atts in source graph: {}".format(count_att_1))
-        
+
         print("reading att file 2...")
 
         count_att_2 = 0
@@ -335,7 +322,7 @@ class Dataset:
                     words_set_string = self.words_of_string(string)
                     words_set.update(words_set_string)
                 words.update(words_set)
-        
+
         print("reading value file 2...")
 
         with open(self.ent_att_val2, "r", encoding="utf-8") as file:
@@ -348,48 +335,51 @@ class Dataset:
                     words_set.update(words_set_string)
                 words.update(words_set)
         print("Number of unique words: {}".format(len(words)))
-        print("Creating dictionary time: {:.4f}".format(time.time() - start_time))
+        print("Creating dictionary time: {:.4f}".format(
+            time.time() - start_time))
         return words
-
 
     def get_bert_embedder(self):
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        config = BertConfig.from_pretrained('bert-base-uncased', output_hidden_states=True)
-        bert_model = BertModel.from_pretrained('bert-base-uncased', config=config)
+        config = BertConfig.from_pretrained(
+            'bert-base-uncased', output_hidden_states=True)
+        bert_model = BertModel.from_pretrained(
+            'bert-base-uncased', config=config)
         bert_model.eval()
-        
+
         start_time = time.time()
         word_embedder = {}
         word_count = 0
         n_words = len(self.words)
         with torch.no_grad():
-            
+
             for word in self.words:
                 word_count += 1
                 if (word_count % 100) == 0:
                     print(word_count, "/", n_words)
-                        
+
                 try:
-                    #try bert stuff
+                    # try bert stuff
                     tokenized_text = tokenizer.tokenize(word)
-                    indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
+                    indexed_tokens = tokenizer.convert_tokens_to_ids(
+                        tokenized_text)
                     tokens_tensor = torch.tensor([indexed_tokens])
                     outputs = bert_model(tokens_tensor)
                     # can use last hidden state as word embeddings
                     last_hidden_state = outputs[0]
-                    word_embed = last_hidden_state[0][0] #batch=0, word in sent=0
+                    # batch=0, word in sent=0
+                    word_embed = last_hidden_state[0][0]
                     word_embedder[word] = np.array(word_embed)
                 except:
-                    #if not, random
+                    # if not, random
                     print("word", word, " rand init")
                     word_embedder[word] = np.random.normal(-0.03, 0.4, 768)
-
 
         available_words = set(list(word_embedder.keys()))
         for word in self.words:
             if word not in available_words:
                 word_embedder[word] = np.random.normal(-0.03, 0.4, 768)
-        print("Getting embedder time: {:.4f}".format(time.time() - start_time))        
+        print("Getting embedder time: {:.4f}".format(time.time() - start_time))
         return word_embedder
 
     def get_embedder(self):
@@ -415,9 +405,8 @@ class Dataset:
             if word not in available_words:
                 word_embedder[word] = np.random.normal(-0.03, 0.4, 300)
         print("Getting embedder time: {:.4f}".format(time.time() - start_time))
-        
+
         return word_embedder
-    
 
     def get_embedding_string(self, string):
         """
@@ -437,7 +426,6 @@ class Dataset:
         embedding = np.mean(np.array(embeddings), axis=0)
         return embedding
 
-
     def get_att_emb(self):
         """
         Return embeddings of all atts as a matrix, att_inndex for both source and target graph.
@@ -452,18 +440,20 @@ class Dataset:
             for line in file:
                 data_line = line.split()
                 att_index1[data_line[1]] = int(data_line[0])
-                att_emb_dict1[int(data_line[0])] = self.get_embedding_string(data_line[1])
+                att_emb_dict1[int(data_line[0])] = self.get_embedding_string(
+                    data_line[1])
         att_emb_matrix1 = np.zeros((len(att_emb_dict1), 300))
         for key, value in att_emb_dict1.items():
             att_emb_matrix1[int(key)] = value
-        
+
         att_index2 = dict()
         att_emb_dict2 = dict()
         with open(self.index_att_2, "r", encoding="utf-8") as file:
             for line in file:
                 data_line = line.split()
                 att_index2[data_line[1]] = int(data_line[0])
-                att_emb_dict2[int(data_line[0])] = self.get_embedding_string(data_line[1])
+                att_emb_dict2[int(data_line[0])] = self.get_embedding_string(
+                    data_line[1])
         att_emb_matrix2 = np.zeros((len(att_emb_dict2), 300))
 
         for key, value in att_emb_dict2.items():
@@ -471,7 +461,6 @@ class Dataset:
 
         return att_emb_matrix1, att_emb_matrix2, att_index1, att_index2
 
-    
     def get_emb_entity(self, att_emb, att_keep, path):
         """
         What is this. What the fuck is this
@@ -501,20 +490,24 @@ class Dataset:
                 # print("Num values: {}".format(len(value)))
                 if len(value):
                     embedding_id /= len(value)
-                
+
                 if id not in embedding_dict.keys():
                     if last_id and not_have_any:
                         count_x += 1
-                        embedding_dict[last_id] = {'value': np.zeros(300), 'att': np.zeros(300)}
+                        embedding_dict[last_id] = {
+                            'value': np.zeros(300), 'att': np.zeros(300)}
                     elif last_id:
-                        embedding_dict[last_id]['value'] = np.mean(np.array(embedding_dict[last_id]['value']), axis=0)
-                        embedding_dict[last_id]['att'] = np.mean(np.array(embedding_dict[last_id]['att']), axis=0)
+                        embedding_dict[last_id]['value'] = np.mean(
+                            np.array(embedding_dict[last_id]['value']), axis=0)
+                        embedding_dict[last_id]['att'] = np.mean(
+                            np.array(embedding_dict[last_id]['att']), axis=0)
                     if int(att_index) not in att_keep:
                         not_have_any = True
                         continue
                     not_have_any = False
-                    embedding_dict[id] = {'value': [embedding_id], 'att': [att_emb[int(att_index)]]}
-                    
+                    embedding_dict[id] = {
+                        'value': [embedding_id], 'att': [att_emb[int(att_index)]]}
+
                 else:
                     if int(att_index) not in att_keep:
                         continue
@@ -522,13 +515,13 @@ class Dataset:
                     embedding_dict[id]['value'].append(embedding_id)
                     embedding_dict[id]['att'].append(att_emb[int(att_index)])
                 last_id = id
-                
 
-            embedding_dict[last_id]['value'] = np.mean(np.array(embedding_dict[last_id]['value']), axis=0)
-            embedding_dict[last_id]['att'] = np.mean(np.array(embedding_dict[last_id]['att']), axis=0)
+            embedding_dict[last_id]['value'] = np.mean(
+                np.array(embedding_dict[last_id]['value']), axis=0)
+            embedding_dict[last_id]['att'] = np.mean(
+                np.array(embedding_dict[last_id]['att']), axis=0)
             last_id = id
         return embedding_dict
-    
 
     def get_emb_entities(self):
         """
@@ -539,10 +532,11 @@ class Dataset:
         att_emb1, att_emb2, att_index1, att_index2 = self.get_att_emb()
         att_keep1 = set(list(att_index1.values()))
         att_keep2 = set(list(att_index2.values()))
-        embedding_dict = self.get_emb_entity(att_emb1, att_keep1, self.ent_att_val1)
-        embedding_dict2 = self.get_emb_entity(att_emb2, att_keep2, self.ent_att_val2)
+        embedding_dict = self.get_emb_entity(
+            att_emb1, att_keep1, self.ent_att_val1)
+        embedding_dict2 = self.get_emb_entity(
+            att_emb2, att_keep2, self.ent_att_val2)
         return embedding_dict, embedding_dict2
-
 
     def get_concated_vector_for_entity(self):
         """
@@ -553,10 +547,10 @@ class Dataset:
         att_emb1, att_emb2, att_index1, att_index2 = self.get_att_emb()
 
         print("get embedding for values ")
-        embedding_dict1, embedding_dict2 = self.get_emb_entity(att_emb1, att_emb2)
+        embedding_dict1, embedding_dict2 = self.get_emb_entity(
+            att_emb1, att_emb2)
 
         return embedding_dict1, embedding_dict2
-    
 
     def get_att_pairs(self, att_emb1, att_emb2, att_index1, att_index2):
         att_emb1 = att_emb1 / np.sqrt((att_emb1**2).sum(axis=1)).reshape(-1, 1)
@@ -567,9 +561,8 @@ class Dataset:
         att_emb2[where_att2_nan] = 0
         simi_matrix = att_emb1.dot(att_emb2.T)
         index_pairs = {}
-        inverse_att_index1 = {int(v):k for k,v in att_index1.items()}
-        inverse_att_index2 = {int(v):k for k,v in att_index2.items()}
-        
+        inverse_att_index1 = {int(v): k for k, v in att_index1.items()}
+        inverse_att_index2 = {int(v): k for k, v in att_index2.items()}
 
         att1_set = set(list(att_index1.keys()))
         att2_set = set(list(att_index2.keys()))
@@ -582,26 +575,27 @@ class Dataset:
             simi_matrix = simi_matrix.T
             simi_matrix[att_index2[ele]] -= 10
             simi_matrix = simi_matrix.T
-        
+
         print("Num common att: {}".format(len(common_att)))
         # print(att_index1.keys())
         for i in range(min(simi_matrix.shape) - len(common_att)):
             new_pair = unravel_index(simi_matrix.argmax(), simi_matrix.shape)
             if simi_matrix[new_pair[0], new_pair[1]] < 0.97:
                 break
-            print(inverse_att_index1[new_pair[0]], inverse_att_index2[new_pair[1]], simi_matrix[new_pair[0], new_pair[1]])
+            print(inverse_att_index1[new_pair[0]], inverse_att_index2[new_pair[1]],
+                  simi_matrix[new_pair[0], new_pair[1]])
             if new_pair[0] == 540:
                 print(new_pair)
                 print(simi_matrix[new_pair[0], new_pair[1]])
                 exit()
             simi_matrix[new_pair[0]] -= 10
-            simi_matrix = simi_matrix.T 
+            simi_matrix = simi_matrix.T
             simi_matrix[new_pair[1]] -= 10
             simi_matrix = simi_matrix.T
             index_pairs[new_pair[0]] = new_pair[1]
 
         return index_pairs
-    
+
     def cosine_simi(self, source_set, target_set):
         # https://datascience.stackexchange.com/questions/5121/applications-and-differences-for-jaccard-similarity-and-cosine-similarity/38850
         if len(source_set) == 0 or len(target_set) == 0:
@@ -609,7 +603,7 @@ class Dataset:
         st_intersect = len(source_set.intersection(target_set))
         s_diff = len(source_set.difference(target_set))
         t_diff = len(target_set.difference(source_set))
-        denom = (st_intersect + s_diff)* (st_intersect + t_diff)
+        denom = (st_intersect + s_diff) * (st_intersect + t_diff)
         num = st_intersect / np.sqrt(denom)
         return num
 
@@ -617,10 +611,10 @@ class Dataset:
         if len(source_set) == 0 or len(target_set) == 0:
             return 0
         return len(source_set.intersection(target_set)) / len(source_set.union(target_set))
-    
-    #take sets of words, embed words, and then compute similarity by clustering
+
+    # take sets of words, embed words, and then compute similarity by clustering
     def embedded_word_simi(self, source_set, target_set):
-        #REMEMBER TO USE word_embedding X for this
+        # REMEMBER TO USE word_embedding X for this
         source_embed = []
         target_embed = []
         for word in source_set:
@@ -635,9 +629,9 @@ class Dataset:
                 target_embed.append(embed)
             except:
                 pass
-        
-        #now have two sets of embeddings.
-        #for each in source, find nearest neighbor in target, add up distances + normalise
+
+        # now have two sets of embeddings.
+        # for each in source, find nearest neighbor in target, add up distances + normalise
         s = 0
         for se in source_embed:
             best_d = None
@@ -649,7 +643,7 @@ class Dataset:
                 s += best_d
         if s != 0:
             s = s/len(source_embed)
-            s = 1/s #close embedding yields larger s
+            s = 1/s  # close embedding yields larger s
         return s
 
     def preprocess_value(self, value):
@@ -658,7 +652,6 @@ class Dataset:
             word_set = set(string.split('_'))
             final_val.update(word_set)
         return final_val
-
 
     def get_the_raw_datastructure(self, path, att_dict_inverse, index_keeped=None):
         data = {}
@@ -682,15 +675,48 @@ class Dataset:
                     if att_index not in index_keeped:
                         continue
                 data[id]['att'].add(att_index)
-                data[id]['att_value'][att_index] = self.preprocess_value(data_line[2:])
+                data[id]['att_value'][att_index] = self.preprocess_value(
+                    data_line[2:])
         return data
+
+    def cluster_common_attributes(self, snode_att, tnode_att, common_att, st_tradeoff, keep_top=0.8):
+        # Find the common attributes
+        source_embed, target_embed = [], []
+        for word in snode_att:
+            if word in self.embedder:
+                embed = self.embedder[word]
+                source_embed.append(embed)
+        for word in tnode_att:
+            if word in self.embedder:
+                embed = self.embedder[word]
+                target_embed.append(embed)
+
+        source_embed = np.array(source_embed).mean(axis=0)
+        target_embed = np.array(target_embed).mean(axis=0)
+
+        not_found = set()
+        iter_set = []
+        for word in common_att:
+            if word not in self.embedder:
+                not_found.add(word)
+            else:
+                embed = np.array(self.embedder[word])
+                source_np = st_tradeoff * \
+                    (np.sum(np.subtract(source_embed, embed)))
+                target_np = (1 - st_tradeoff) * \
+                    (np.sum(np.subtract(target_embed, embed)))
+
+                iter_set.append((source_np + target_np, word))
+        iter_set.sort(key=lambda x: x[0])
+        ret_list = [x[1] for x in iter_set[:int(len(iter_set) * keep_top)]]
+        for word in not_found:
+            ret_list.append(word)
+        return ret_list
 
 
 if __name__ == "__main__":
-
 
     # print("vinhsuhi")
     dataset = Dataset("", "ja_en", demo=True)
     # att_emb_matrix1, att_emb_matrix2, att_index1, att_index2 = dataset.get_att_emb()
     embedding_dict1, embedding_dict2 = dataset.get_emb_entities()
-
